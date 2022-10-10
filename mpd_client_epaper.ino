@@ -26,7 +26,6 @@
 //       uncomment it in GxEPD2_GFX.h too, or add #include <GFX.h> before any #include <GxEPD2_GFX.h>
 // !!!!  ============================================================================================ !!!!
 
-
 #include <GxEPD2_BW.h>
 #include <GxEPD2_3C.h>
 #include <GxEPD2_7C.h>
@@ -167,49 +166,6 @@ void getItem(String line, char *item, struct VersionedChar &target)
     value.toCharArray(target.value, value.length() + 1);
     target.updated = true;
   }
-}
-
-void string2char(String line, char *cstr4, int len)
-{
-  char cstr3[40];
-  line.toCharArray(cstr3, line.length() + 1);
-  //Serial.println("cstr3=[" + String(cstr3) + "]");
-  int pos4 = 0;
-  for (int i = 0; i < strlen(cstr3); i++)
-  {
-    //if (cstr3[i] == ' ') continue;
-    if (cstr3[i] == ' ' && pos4 == 0)
-      continue;
-    cstr4[pos4++] = cstr3[i];
-    cstr4[pos4] = 0;
-    if (pos4 == (len - 1))
-      break;
-  }
-  //Serial.println("cstr4=[" + String(cstr4) + "]");
-}
-
-void fillBuffer(char *line, int len)
-{
-  int sz = strlen(line);
-  for (int i = sz; i < len; i++)
-  {
-    line[i] = 0x20;
-    line[i + 1] = 0;
-  }
-}
-
-void lcdDisplay(char *lcdbuf, int rows)
-{
-  char line[17];
-  memset(line, 0, sizeof(line));
-  strncpy(line, lcdbuf, 16);
-  fillBuffer(line, 16);
-  Serial.println("line1=[" + String(line) + "]");
-
-  Serial.println("line2=[" + String(line) + "]");
-  Serial.println("line3=[" + String(line) + "]");
-
-  Serial.println("line4=[" + String(line) + "]");
 }
 
 void showPartialUpdate(int count)
