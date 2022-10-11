@@ -29,7 +29,7 @@ const char HelloEpaper[] = "Hello E-Paper!";
 
 void displayInfo(GxEPD2_GFX& display, char* row1, char* row2, char* row3, char* row4){
   display.setRotation(1);
-  display.setFont(&FreeMonoBoldOblique12pt7b);
+  display.setFont(&FreeMonoBold9pt7b);
   display.setTextColor(GxEPD_BLACK);
   int16_t tbx, tby; uint16_t tbw, tbh;
   display.getTextBounds(HelloWorld, 0, 0, &tbx, &tby, &tbw, &tbh);
@@ -57,7 +57,7 @@ void helloWorld(GxEPD2_GFX& display, int time)
 {
   //Serial.println("helloWorld");
   display.setRotation(1);
-  display.setFont(&FreeMonoBoldOblique12pt7b);
+  display.setFont(&FreeMonoBold9pt7b);
   display.setTextColor(GxEPD_BLACK);
   int16_t tbx, tby; uint16_t tbw, tbh;
   display.getTextBounds(HelloWorld, 0, 0, &tbx, &tby, &tbw, &tbh);
