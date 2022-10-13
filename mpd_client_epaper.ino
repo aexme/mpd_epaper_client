@@ -82,6 +82,18 @@ CurrentSong currentSong;
 
 BitmapDisplay bitmaps(display);
 
+// PINS
+const int trigPin = 12;
+const int echoPin = 14;
+const int button1 = 21;
+const int button2 = 22;
+const int button3 = 32;
+const int button4 = 33;
+
+//define sound speed in cm/uS
+#define SOUND_SPEED 0.034
+#define CM_TO_INCH 0.393701
+
 uint16_t port = 6600;
 char *host = "192.168.178.49"; // ip or dns
 
@@ -91,20 +103,38 @@ WiFiClient client;
 
 char command[20];
 
+int counter = 1;
+float distance = 150; 
+
+// update value for interaction or standby
+int highActivityInterval = 1000;
+int lowActivityInterval = 7000;
+
+TextBox displayRows[7] = {
+  {0, 0, 264, 30, 1, 2}, 
+  {0, 50, 264, 40, 2, 1},
+  {0, 92, 264, 20, 1, 1},
+  {0, 112, 264, 20, 1, 1},
+  {0, 134, 264, 20, 1, 1},
+  {0, 156, 264, 20, 1, 2},
+}; 
+
 void setup()
 {
   Serial.begin(115200);
   Serial.println("setup");
   
-  pinMode(21,INPUT_PULLUP);
-  pinMode(22,INPUT_PULLUP);
-  pinMode(32,INPUT_PULLUP);
-  pinMode(33,INPUT_PULLUP);
+  pinMode(button1,INPUT_PULLUP);
+  pinMode(button2,INPUT_PULLUP);
+  pinMode(button3,INPUT_PULLUP);
+  pinMode(button4,INPUT_PULLUP);
 
-  attachInterrupt(digitalPinToInterrupt(21), myisr21, CHANGE);  
-  attachInterrupt(digitalPinToInterrupt(22), myisr22, CHANGE);  
-  attachInterrupt(digitalPinToInterrupt(32), myisr32, CHANGE);  
-  attachInterrupt(digitalPinToInterrupt(33), myisr33, CHANGE);  
+  attachInterrupt(digitalPinToInterrupt(button1), myisr21, CHANGE);  
+  attachInterrupt(digitalPinToInterrupt(button2), myisr22, CHANGE);  
+  attachInterrupt(digitalPinToInterrupt(button3), myisr32, CHANGE);  
+  attachInterrupt(digitalPinToInterrupt(button4), myisr33, CHANGE);  
+  pinMode(trigPin, OUTPUT); // Sets the trigPin as an Output
+  pinMode(echoPin, INPUT); // Sets the echoPin as an Input
 
   Serial.begin(115200);
 
@@ -148,10 +178,6 @@ void setup()
   Serial.println("setup done");
 }
 
-int counter = 0;
-
-int updateAfterLoops = 200;
-
 void loop()
 {  
   if (!client.connected())
@@ -161,9 +187,27 @@ void loop()
     ESP.restart();
   }
   
-  if(counter>=updateAfterLoops){
-    updateScreen();
-    counter = -1;
+  int interval = lowActivityInterval/10;
+
+  if(distance<100){
+    Serial.println("highUpdateInterval");
+    interval = highActivityInterval/10;
+  }
+
+  // do fullscreen update every 10x of interval
+  if(counter % (interval*10) == 0){
+    Serial.println("fullScreenUpdate");
+    display.refresh();
+
+    // don't imideatelly do partial update
+    counter = + counter +  (interval/2);
+  }
+
+  if(counter % interval == 0){
+    updateScreen(); 
+    if(interval == lowActivityInterval){
+      display.hibernate();
+    }
   }
 
   if(strlen(command) > 1){
@@ -173,11 +217,36 @@ void loop()
     }
     mpc_command(command);
     String(" ").toCharArray(command, 20);
-    counter=updateAfterLoops-1;
+    // refresh screen on next run
+    counter = interval-1;
   }
 
   counter++;
+  if(counter > 2147483600){
+    counter = 1;
+  }
+  if(counter % 20 == 0){
+    getDistance();
+  }
+
   delay(10);
+}
+
+void getDistance(){
+    // Clears the trigPin
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(5);
+  // Sets the trigPin on HIGH state for 10 micro seconds
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  long duration = pulseIn(echoPin, HIGH);
+  
+  // Calculate the distance
+  distance = duration * SOUND_SPEED/2;
+  //Serial.print("distance: ");
+  //Serial.println(distance);
 }
 
 void myisr21(){
@@ -238,8 +307,11 @@ void updateScreen(){
   if (String(mpdStatus.state.value) == "play")
   {
     getCurrentSong(client, currentSong);
+
     buildTimeString(mpdStatus, currentSong.time.value);
+
     doPartialUpdate(currentSong);
+
     setAllToUpdatedFalse(currentSong, mpdStatus);
   }
 }
@@ -249,7 +321,6 @@ int mpc_connect(char *host, int port)
   char smsg[40];
   char rmsg[40];
 
-  Serial.println("hmm?");
   if (!client.connect(host, port, 1000))
   {
     Serial.println("connection failed");
@@ -275,7 +346,7 @@ int mpc_command(char *buf)
   char rmsg[40];
   sprintf(smsg, "%s\n", buf);
   client.print(smsg);
-  Serial.println("smsg=[" + String(buf) + "]");
+  Serial.println("mpdCommand=[" + String(buf) + "]");
 
   String line;
   client.setTimeout(1000);
@@ -290,9 +361,6 @@ void mpc_error(char *buf)
 {
   Serial.print("mpc command error:");
   Serial.println(buf);
-  while (1)
-  {
-  }
 }
 
 void getItem(String line, char *item, struct VersionedChar &target)
@@ -327,23 +395,14 @@ void getItem(String line, char *item, struct VersionedChar &target)
 
 void showPartialUpdate(char *item, int row)
 {
-  TextBox rows[7] = {
-    {0, 0, 264, 30, 1, 2}, 
-    {0, 50, 264, 40, 2, 1},
-    {0, 92, 264, 20, 1, 1},
-    {0, 112, 264, 20, 1, 1},
-    {0, 134, 264, 20, 1, 1},
-    {0, 156, 264, 20, 1, 2},
-  }; 
-
-  uint16_t box_x = rows[row-1].x;
-  uint16_t box_y = rows[row-1].y;
-  uint16_t box_w = rows[row-1].w;
-  uint16_t box_h = rows[row-1].h;
+  uint16_t box_x = displayRows[row-1].x;
+  uint16_t box_y = displayRows[row-1].y;
+  uint16_t box_w = displayRows[row-1].w;
+  uint16_t box_h = displayRows[row-1].h;
   uint16_t cursor_y = box_y + box_h - 6;
   uint16_t incr = display.epd2.hasFastPartialUpdate ? 1 : 3;
   
-  if(rows[row-1].font == 1){
+  if(displayRows[row-1].font == 1){
     display.setFont(&FreeMono9pt7b);
   }else{
     display.setFont(&FreeMonoBold12pt7b);
@@ -356,7 +415,7 @@ void showPartialUpdate(char *item, int row)
   display.firstPage();
   do
   {
-    if(rows[row-1].rows == 2){
+    if(displayRows[row-1].rows == 2){
       cursor_y = box_y + (box_h/2) - 6;
       display.fillRect(box_x, box_y, box_w, box_h, GxEPD_WHITE);
       display.setCursor(box_x, cursor_y);
@@ -374,11 +433,11 @@ void showPartialUpdate(char *item, int row)
 
 void doPartialUpdate(struct CurrentSong &currentSong){
 
-  if(currentSong.artist.updated){
+  if(currentSong.artist.updated){    
     showPartialUpdate(currentSong.artist.value, 1);
   }
 
-  if(currentSong.name.updated && strlen(currentSong.artist.value)<1){
+  if(currentSong.name.updated && strlen(currentSong.artist.value)<=1){
     showPartialUpdate(currentSong.name.value, 1);
   }
 

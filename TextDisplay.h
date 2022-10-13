@@ -18,14 +18,5 @@
 
 #include "GxEPD2_GFX.h"
 
-void displayInfo(GxEPD2_GFX& displayn, char* row1, char* row2, char* row3, char* row4);
-void helloWorld(GxEPD2_GFX& displayn, int time);
-void helloWorldForDummies(GxEPD2_GFX& display);
-void helloFullScreenPartialMode(GxEPD2_GFX& display);
-void helloArduino(GxEPD2_GFX& display);
-void helloEpaper(GxEPD2_GFX& display);
-void helloValue(GxEPD2_GFX& display, double v, int digits);
-void showFont(GxEPD2_GFX& display, const char name[], const GFXfont* f);
-void drawFont(GxEPD2_GFX& display, const char name[], const GFXfont* f);
 
 #endif
