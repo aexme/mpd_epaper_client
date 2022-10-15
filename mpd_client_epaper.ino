@@ -90,10 +90,6 @@ const int button2 = 22;
 const int button3 = 32;
 const int button4 = 33;
 
-//define sound speed in cm/uS
-#define SOUND_SPEED 0.034
-#define CM_TO_INCH 0.393701
-
 uint16_t port = 6600;
 char *host = "192.168.178.49"; // ip or dns
 
@@ -104,19 +100,14 @@ WiFiClient client;
 char command[20];
 
 int counter = 1;
-float distance = 150; 
-
-// update value for interaction or standby
-int highActivityInterval = 1000;
-int lowActivityInterval = 7000;
+int fullscreenRefresh = 180000;
+unsigned long previousMillis  = 1;
 
 TextBox displayRows[7] = {
-  {0, 0, 264, 30, 1, 2}, 
-  {0, 50, 264, 40, 2, 1},
-  {0, 92, 264, 20, 1, 1},
-  {0, 112, 264, 20, 1, 1},
-  {0, 134, 264, 20, 1, 1},
-  {0, 156, 264, 20, 1, 2},
+  {0, 0, 264, 60, 2, 2}, 
+  {0, 62, 264, 40, 2, 1},
+  {0, 102, 264, 40, 2, 1},
+  {0, 152, 264, 20, 1, 1},
 }; 
 
 void setup()
@@ -133,10 +124,6 @@ void setup()
   attachInterrupt(digitalPinToInterrupt(button2), myisr22, CHANGE);  
   attachInterrupt(digitalPinToInterrupt(button3), myisr32, CHANGE);  
   attachInterrupt(digitalPinToInterrupt(button4), myisr33, CHANGE);  
-  pinMode(trigPin, OUTPUT); // Sets the trigPin as an Output
-  pinMode(echoPin, INPUT); // Sets the echoPin as an Input
-
-  Serial.begin(115200);
 
   Serial.print("Wait for WiFi...");
   WiFi.begin(SSID, PASSWORD);
@@ -186,30 +173,20 @@ void loop()
     delay(10 * 1000);
     ESP.restart();
   }
-  
-  int interval = lowActivityInterval/10;
 
-  if(distance<100){
-    Serial.println("highUpdateInterval");
-    interval = highActivityInterval/10;
-  }
-
-  // do fullscreen update every 10x of interval
-  if(counter % (interval*10) == 0){
-    Serial.println("fullScreenUpdate");
+  // do fullscreen update every 180s
+  if(millis() - previousMillis > fullscreenRefresh ){
+    //Serial.println("fullScreenUpdate");
     display.refresh();
-
-    // don't imideatelly do partial update
-    counter = + counter +  (interval/2);
+    previousMillis = millis();
   }
 
-  if(counter % interval == 0){
-    updateScreen(); 
-    if(interval == lowActivityInterval){
-      display.hibernate();
-    }
+  if(millis() - previousMillis > 500){
+    //Serial.println("updateScreen");
+    updateScreen();
+    previousMillis = millis(); 
   }
-
+  
   if(strlen(command) > 1){
 
     if(command == "pause" && String(mpdStatus.state.value) != "play"){
@@ -217,36 +194,9 @@ void loop()
     }
     mpc_command(command);
     String(" ").toCharArray(command, 20);
-    // refresh screen on next run
-    counter = interval-1;
-  }
-
-  counter++;
-  if(counter > 2147483600){
-    counter = 1;
-  }
-  if(counter % 20 == 0){
-    getDistance();
   }
 
   delay(10);
-}
-
-void getDistance(){
-    // Clears the trigPin
-  digitalWrite(trigPin, LOW);
-  delayMicroseconds(5);
-  // Sets the trigPin on HIGH state for 10 micro seconds
-  digitalWrite(trigPin, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(trigPin, LOW);
-
-  long duration = pulseIn(echoPin, HIGH);
-  
-  // Calculate the distance
-  distance = duration * SOUND_SPEED/2;
-  //Serial.print("distance: ");
-  //Serial.println(distance);
 }
 
 void myisr21(){
@@ -307,13 +257,10 @@ void updateScreen(){
   if (String(mpdStatus.state.value) == "play")
   {
     getCurrentSong(client, currentSong);
-
-    buildTimeString(mpdStatus, currentSong.time.value);
-
-    doPartialUpdate(currentSong);
-
-    setAllToUpdatedFalse(currentSong, mpdStatus);
   }
+
+  doPartialUpdate(currentSong, mpdStatus);
+  setAllToUpdatedFalse(currentSong, mpdStatus);
 }
 
 int mpc_connect(char *host, int port)
@@ -431,7 +378,7 @@ void showPartialUpdate(char *item, int row)
   display.firstPage();
 }
 
-void doPartialUpdate(struct CurrentSong &currentSong){
+void doPartialUpdate(struct CurrentSong &currentSong, struct MpdStatus &mpdStatus){
 
   if(currentSong.artist.updated){    
     showPartialUpdate(currentSong.artist.value, 1);
@@ -449,28 +396,10 @@ void doPartialUpdate(struct CurrentSong &currentSong){
     showPartialUpdate(currentSong.album.value, 3);
   }
 
-  showPartialUpdate(currentSong.time.value, 6);  
-}
-
-void buildTimeString(struct MpdStatus &mpdStatus, char *target){
-  int elapsedNumber = String(mpdStatus.elapsed.value).toInt();
-  int durationNumber = String(mpdStatus.duration.value).toInt();
-
-  int elapsedS = 0;
-  int elapsedM = 0;
-  int elapsedH = 0;
-
-  int durationS = 0;
-  int durationM = 0;
-  int durationH = 0;
-
-  secondsToHMS(elapsedNumber, elapsedH, elapsedM, elapsedS);
-  secondsToHMS(durationNumber, durationH, durationM, durationS);
-
-  String timeString = appendZero(elapsedH) + ":" + appendZero(elapsedM) + ":" + appendZero(elapsedS) + "/" + appendZero(durationH) + ":" + appendZero(durationM) + ":" + appendZero(durationS);
-  Serial.print("time");
-  Serial.println(timeString);
-  timeString.toCharArray(target, 19);  
+  if(mpdStatus.state.updated){
+    showPartialUpdate(mpdStatus.state.value, 4);
+  }
+    
 }
 
 void setAllToUpdatedFalse(struct CurrentSong &currentSong, struct MpdStatus &mpdStatus){
@@ -591,14 +520,4 @@ void getMpdStatus(WiFiClient client, struct MpdStatus &mpdStatus)
   if(!foundduration){
     String("0").toCharArray(mpdStatus.duration.value, 46);
   }
-}
-
-void secondsToHMS(const int seconds, int &h, int &m, int &s)
-{
-  uint32_t t = seconds;
-  s = t % 60;
-  t = (t - s) / 60;
-  m = t % 60;
-  t = (t - m) / 60;
-  h = t;
 }
