@@ -100,7 +100,8 @@ WiFiClient client;
 char command[20];
 
 int counter = 1;
-int fullscreenRefresh = 180000;
+// every 5 min
+int fullscreenRefreshInterval = 300000;
 unsigned long previousMillis  = 1;
 
 TextBox displayRows[7] = {
@@ -167,6 +168,8 @@ void setup()
 
 void loop()
 {  
+
+  int lastFullscreenRefresh = fullscreenRefreshInterval;
   if (!client.connected())
   {
     Serial.println("server disconencted");
@@ -175,9 +178,10 @@ void loop()
   }
 
   // do fullscreen update every 180s
-  if(millis() - previousMillis > fullscreenRefresh ){
-    //Serial.println("fullScreenUpdate");
+  if(millis() > lastFullscreenRefresh ){
+    Serial.println("fullScreenUpdate");
     display.refresh();
+    lastFullscreenRefresh += fullscreenRefreshInterval;
     previousMillis = millis();
   }
 
@@ -196,7 +200,13 @@ void loop()
     String(" ").toCharArray(command, 20);
   }
 
-  delay(10);
+  // when millis are reset
+  if(millis() < previousMillis){
+    previousMillis = millis();
+    lastFullscreenRefresh = fullscreenRefreshInterval;;
+  }
+
+  delay(300);
 }
 
 void myisr21(){
@@ -207,7 +217,7 @@ void myisr21(){
   if (millis()-lastButtonTime21 > 300) {
     state21 = !state21;
     if (state21) delayTime = 500; else delayTime = 50;
-    String("pause").toCharArray(command, 20);
+    String("previous").toCharArray(command, 20);
 
     lastButtonTime21 = millis();
   }
@@ -220,7 +230,7 @@ void myisr22(){
   if (millis()-lastButtonTime22 > 300) {
     state22 = !state22;
     if (state22) delayTime = 500; else delayTime = 50;
-    String("next").toCharArray(command, 20);
+    String("previous").toCharArray(command, 20);
 
     lastButtonTime22 = millis();
   }
@@ -233,7 +243,7 @@ void myisr32(){
   if (millis()-lastButtonTime32 > 300) {
     state32 = !state32;
     if (state32) delayTime = 500; else delayTime = 50;
-    String("previous").toCharArray(command, 20);
+    String("next").toCharArray(command, 20);
 
     lastButtonTime32 = millis();
   }
@@ -246,7 +256,7 @@ void myisr33(){
   if (millis()-lastButtonTime33 > 300) {
     state33 = !state33;
     if (state33) delayTime = 500; else delayTime = 50;
-    String("previous").toCharArray(command, 20);
+    String("pause").toCharArray(command, 20);
     lastButtonTime33 = millis();
   }
 }
